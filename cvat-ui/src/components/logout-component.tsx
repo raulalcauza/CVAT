@@ -1,4 +1,4 @@
-// Copyright (C) 2022 CVAT.ai Corporation
+// Copyright (C) 2022-2024 CVAT.ai Corporation
 //
 // SPDX-License-Identifier: MIT
 
@@ -16,9 +16,9 @@ function LogoutComponent(): JSX.Element {
 
     useEffect(() => {
         dispatch(saveLogsAsync()).then(() => {
-            dispatch(logoutAsync()).then(() => {
-                history.goBack();
-            });
+            // a way to avoid saving /auth/logout in `next` query parameter
+            history.goBack();
+            dispatch(logoutAsync());
         });
     }, []);
 
