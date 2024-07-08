@@ -40,6 +40,7 @@ export enum Actions {
     OPEN_TASK = 'open_task',
     FINISH_JOB = 'finish_job',
     RENEW_JOB = 'renew_job',
+    PUBLISH_JOB = 'publish_job',
 }
 
 function AnnotationMenuComponent(): JSX.Element {
@@ -97,6 +98,17 @@ function AnnotationMenuComponent(): JSX.Element {
             stage: JobStage.ACCEPTANCE,
         })).then(() => {
             history.push(`/tasks/${jobInstance.taskId}`);
+        });
+    }, [jobInstance]);
+
+    const publishJob = useCallback(() => {
+        jobInstance.stage = JobStage.PUBLISHED;
+        jobInstance.state = core.enums.JobState.COMPLETED;
+        updateJob(jobInstance).then((success) => {
+            if (success) {
+                message.info('Job published', 2);
+                history.push(`/tasks/${jobInstance.taskId}`);
+            }
         });
     }, [jobInstance]);
 
@@ -299,6 +311,21 @@ function AnnotationMenuComponent(): JSX.Element {
             },
         });
     }
+
+    menuItems.push({
+        key: Actions.PUBLISH_JOB,
+        label: 'Publish the job',
+        onClick: () => {
+            Modal.confirm({
+                title: 'This will make the job accessible to all organization members.',
+                content: 'Stage will be changed to "published". Would you like to continue?',
+                okText: 'Continue',
+                cancelText: 'Cancel',
+                className: 'cvat-modal-content-publish-job',
+                onOk: publishJob,
+            });
+        },
+    });
 
     return (
         <Dropdown
