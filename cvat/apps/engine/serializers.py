@@ -569,6 +569,8 @@ class LabelSerializer(SublabelSerializer):
             parent_serializer = TaskWriteSerializer(
                 instance=instance.task, data=parent_query, partial=True,
             )
+        else:
+            assert False, f"Label {instance.id} is not attached to either a project or a task"
 
         parent_serializer.is_valid(raise_exception=True)
         parent_serializer.save()
