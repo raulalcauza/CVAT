@@ -639,7 +639,7 @@ class _MemoizingAnnotationConverter(CvatToDmAnnotationConverter):
         return converted
 
 
-def _match_segments(
+def match_segments(
     a_segms,
     b_segms,
     distance=dm.ops.segment_iou,
@@ -1047,7 +1047,7 @@ class _DistanceComparator(dm.ops.DistanceComparator):
             if label_matcher:
                 extra_args["label_matcher"] = label_matcher
 
-            returned_values = _match_segments(
+            returned_values = match_segments(
                 a_objs,
                 b_objs,
                 distance=distance,
@@ -1294,7 +1294,7 @@ class _DistanceComparator(dm.ops.DistanceComparator):
                 a_points = np.reshape(a.points, (-1, 2))
                 b_points = np.reshape(b.points, (-1, 2))
 
-                matches, mismatches, a_extra, b_extra = _match_segments(
+                matches, mismatches, a_extra, b_extra = match_segments(
                     range(len(a_points)),
                     range(len(b_points)),
                     distance=lambda ai, bi: _OKS(
@@ -1582,7 +1582,7 @@ class _Comparator:
             union = len(gt_groups[gt_group_id]) + len(ds_groups[ds_group_id]) - intersection
             return intersection / (union or 1)
 
-        matches, mismatches, gt_unmatched, ds_unmatched = _match_segments(
+        matches, mismatches, gt_unmatched, ds_unmatched = match_segments(
             list(gt_groups),
             list(ds_groups),
             distance=_group_distance,
@@ -1930,7 +1930,7 @@ class DatasetComparator:
         invalid_labels_count = len(mismatches)
         total_labels_count = valid_labels_count + invalid_labels_count
 
-        confusion_matrix_labels, confusion_matrix = self._make_zero_confusion_matrix()
+        confusion_matrix_labels, confusion_matrix, label_id_map = self._make_zero_confusion_matrix()
         for gt_ann, ds_ann in itertools.chain(
             # fully matched annotations - shape, label, attributes
             matches,
@@ -1938,8 +1938,8 @@ class DatasetComparator:
             zip(itertools.repeat(None), ds_unmatched),
             zip(gt_unmatched, itertools.repeat(None)),
         ):
-            ds_label_idx = ds_ann.label if ds_ann else self._UNMATCHED_IDX
-            gt_label_idx = gt_ann.label if gt_ann else self._UNMATCHED_IDX
+            ds_label_idx = label_id_map[ds_ann.label] if ds_ann else self._UNMATCHED_IDX
+            gt_label_idx = label_id_map[gt_ann.label] if gt_ann else self._UNMATCHED_IDX
             confusion_matrix[ds_label_idx, gt_label_idx] += 1
 
         self._frame_results[frame_id] = ComparisonReportFrameSummary(
@@ -1970,18 +1970,20 @@ class DatasetComparator:
     # row/column index in the confusion matrix corresponding to unmatched annotations
     _UNMATCHED_IDX = -1
 
-    def _make_zero_confusion_matrix(self) -> Tuple[List[str], np.ndarray]:
-        label_names = [
-            label.name
-            for label in self._gt_dataset.categories()[dm.AnnotationType.label]
-            if not label.parent
-        ]
-        label_names.append("unmatched")
-        num_labels = len(label_names)
+    def _make_zero_confusion_matrix(self) -> Tuple[List[str], np.ndarray, Dict[int, int]]:
+        label_id_idx_map = {}
+        label_names = []
+        for label_id, label in enumerate(self._gt_dataset.categories()[dm.AnnotationType.label]):
+            if not label.parent:
+                label_id_idx_map[label_id] = len(label_names)
+                label_names.append(label.name)
 
+        label_names.append("unmatched")
+
+        num_labels = len(label_names)
         confusion_matrix = np.zeros((num_labels, num_labels), dtype=int)
 
-        return label_names, confusion_matrix
+        return label_names, confusion_matrix, label_id_idx_map
 
     @classmethod
     def _generate_annotations_summary(
@@ -2050,7 +2052,7 @@ class DatasetComparator:
             ),
         )
         mean_ious = []
-        confusion_matrix_labels, confusion_matrix = self._make_zero_confusion_matrix()
+        confusion_matrix_labels, confusion_matrix, _ = self._make_zero_confusion_matrix()
 
         for frame_id, frame_result in self._frame_results.items():
             intersection_frames.append(frame_id)

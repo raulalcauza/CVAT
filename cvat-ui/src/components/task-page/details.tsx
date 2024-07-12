@@ -7,11 +7,14 @@ import React from 'react';
 import { connect } from 'react-redux';
 
 import { Row, Col } from 'antd/lib/grid';
+import Tag from 'antd/lib/tag';
 import Text from 'antd/lib/typography/Text';
 import Title from 'antd/lib/typography/Title';
 import moment from 'moment';
 
-import { getCore, Task, User } from 'cvat-core-wrapper';
+import {
+    User, getCore, Project, Task,
+} from 'cvat-core-wrapper';
 import AutomaticAnnotationProgress from 'components/tasks-page/automatic-annotation-progress';
 import MdGuideControl from 'components/md-guide/md-guide-control';
 import Preview from 'components/common/preview';
@@ -29,9 +32,7 @@ interface OwnProps {
 
 interface StateToProps {
     activeInference: ActiveInference | null;
-    projectSubsets: string[];
-    dumpers: any[];
-    user: any;
+    project?: Project;
 }
 
 interface DispatchToProps {
@@ -39,18 +40,10 @@ interface DispatchToProps {
 }
 
 function mapStateToProps(state: CombinedState, own: OwnProps): StateToProps & OwnProps {
-    const [taskProject] = state.projects.current.filter((project) => project.id === own.task.projectId);
-
     return {
         ...own,
-        dumpers: state.formats.annotationFormats.dumpers,
-        user: state.auth.user,
         activeInference: state.models.inferences[own.task.id] || null,
-        projectSubsets: taskProject ?
-            ([
-                ...new Set(taskProject.subsets),
-            ] as string[]) :
-            [],
+        project: state.projects.current.find((project) => project.id === own.task.projectId),
     };
 }
 
@@ -67,6 +60,7 @@ const core = getCore();
 interface State {
     name: string;
     subset: string;
+    consensusJobsPerNormalJob: number;
 }
 
 type Props = DispatchToProps & StateToProps & OwnProps;
@@ -78,6 +72,7 @@ class DetailsComponent extends React.PureComponent<Props, State> {
         this.state = {
             name: taskInstance.name,
             subset: taskInstance.subset,
+            consensusJobsPerNormalJob: taskInstance.consensusJobsPerNormalJob,
         };
     }
 
@@ -94,29 +89,35 @@ class DetailsComponent extends React.PureComponent<Props, State> {
     private renderTaskName(): JSX.Element {
         const { name } = this.state;
         const { task: taskInstance, onUpdateTask } = this.props;
+        const taskName = name;
 
         return (
-            <Title
-                level={4}
-                editable={{
-                    onChange: (value: string): void => {
-                        this.setState({
-                            name: value,
-                        });
+            <Row>
+                <Col>
+                    <Title
+                        level={4}
+                        editable={{
+                            onChange: (value: string): void => {
+                                this.setState({
+                                    name: value,
+                                });
 
-                        taskInstance.name = value;
-                        onUpdateTask(taskInstance);
-                    },
-                }}
-                className='cvat-text-color cvat-task-name'
-            >
-                {name}
-            </Title>
+                                taskInstance.name = value;
+                                onUpdateTask(taskInstance);
+                            },
+                        }}
+                        className='cvat-text-color cvat-task-name'
+                    >
+                        {taskName}
+                    </Title>
+                </Col>
+            </Row>
         );
     }
 
     private renderDescription(): JSX.Element {
         const { task: taskInstance, onUpdateTask } = this.props;
+        const { consensusJobsPerNormalJob } = this.state;
         const owner = taskInstance.owner ? taskInstance.owner.username : null;
         const assignee = taskInstance.assignee ? taskInstance.assignee : null;
         const created = moment(taskInstance.createdDate).format('MMMM Do YYYY');
@@ -130,12 +131,18 @@ class DetailsComponent extends React.PureComponent<Props, State> {
                 }}
             />
         );
+        const consensusTag = consensusJobsPerNormalJob > 0 && <Tag color='#1890ff'>Consensus Based Annotation</Tag>;
 
         return (
             <Row className='cvat-task-details-user-block' justify='space-between' align='middle'>
                 <Col span={12}>
                     {owner && (
-                        <Text type='secondary'>{`Task #${taskInstance.id} Created by ${owner} on ${created}`}</Text>
+                        <div>
+                            {consensusTag}
+                            <Text type='secondary'>
+                                {`Task #${taskInstance.id} Created by ${owner} on ${created}`}
+                            </Text>
+                        </div>
                     )}
                 </Col>
                 <Col>
@@ -166,11 +173,7 @@ class DetailsComponent extends React.PureComponent<Props, State> {
 
     private renderSubsetField(): JSX.Element {
         const { subset } = this.state;
-        const {
-            task: taskInstance,
-            projectSubsets,
-            onUpdateTask,
-        } = this.props;
+        const { task: taskInstance, project, onUpdateTask } = this.props;
 
         return (
             <Row>
@@ -181,11 +184,9 @@ class DetailsComponent extends React.PureComponent<Props, State> {
                     <ProjectSubsetField
                         value={subset}
                         projectId={taskInstance.projectId as number}
-                        projectSubsets={projectSubsets}
+                        projectSubsets={project?.subsets ?? null}
                         onChange={(value) => {
-                            this.setState({
-                                subset: value,
-                            });
+                            this.setState({ subset: value });
 
                             if (taskInstance.subset !== value) {
                                 taskInstance.subset = value;
