@@ -8,6 +8,7 @@ import { Canvas, RectDrawingMethod, CuboidDrawingMethod } from 'cvat-canvas-wrap
 import {
     Webhook, MLModel, Organization, Job, Label, User,
     QualityConflict, FramesMetaData, RQStatus, Event, Invitation, SerializedAPISchema,
+    Request,
 } from 'cvat-core-wrapper';
 import { IntelligentScissors } from 'utils/opencv-wrapper/intelligent-scissors';
 import { KeyMap } from 'utils/mousetrap-react';
@@ -115,37 +116,22 @@ export interface TasksState {
 export interface ExportState {
     projects: {
         dataset: {
-            current: {
-                [id: number]: string[];
-            };
             modalInstance: any | null;
         };
         backup: {
-            current: {
-                [id: number]: boolean;
-            };
             modalInstance: any | null;
         };
     };
     tasks: {
         dataset: {
-            current: {
-                [id: number]: string[];
-            };
             modalInstance: any | null;
         };
         backup: {
-            current: {
-                [id: number]: boolean;
-            };
             modalInstance: any | null;
         };
     };
     jobs: {
         dataset: {
-            current: {
-                [id: number]: string[];
-            };
             modalInstance: any | null;
         };
     };
@@ -156,12 +142,11 @@ export interface ImportState {
     projects: {
         dataset: {
             modalInstance: any | null;
-            current: {
-                [id: number]: {
-                    format: string;
-                    progress: number;
-                    status: string;
-                };
+            uploadState: {
+                id: number | null,
+                format: string;
+                progress: number;
+                status: string;
             };
         };
         backup: {
@@ -172,9 +157,6 @@ export interface ImportState {
     tasks: {
         dataset: {
             modalInstance: any | null;
-            current: {
-                [id: number]: string;
-            };
         };
         backup: {
             modalVisible: boolean;
@@ -184,12 +166,18 @@ export interface ImportState {
     jobs: {
         dataset: {
             modalInstance: any | null;
-            current: {
-                [id: number]: string;
-            };
         };
     };
     instanceType: 'project' | 'task' | 'job' | null;
+}
+
+export interface ConsensusState {
+    fetching: boolean;
+    consensusSettings: any | null;
+    taskInstance: any | null;
+    mergingConsensus: {
+        [tid: number]: boolean;
+    };
 }
 
 export interface FormatsState {
@@ -434,6 +422,12 @@ export interface ErrorState {
     className?: string;
 }
 
+export interface NotificationState {
+    message: string;
+    description?: string;
+    duration?: number;
+}
+
 export interface NotificationsState {
     errors: {
         auth: {
@@ -467,6 +461,7 @@ export interface NotificationsState {
             exporting: null | ErrorState;
             importing: null | ErrorState;
             moving: null | ErrorState;
+            mergingConsensus: null | ErrorState;
         };
         jobs: {
             updating: null | ErrorState;
@@ -495,6 +490,7 @@ export interface NotificationsState {
         annotation: {
             saving: null | ErrorState;
             jobFetching: null | ErrorState;
+            jobUpdating: null | ErrorState;
             frameFetching: null | ErrorState;
             changingLabelColor: null | ErrorState;
             updating: null | ErrorState;
@@ -577,41 +573,47 @@ export interface NotificationsState {
             acceptingInvitation: null | ErrorState;
             decliningInvitation: null | ErrorState;
             resendingInvitation: null | ErrorState;
+        };
+        requests: {
+            fetching: null | ErrorState;
+            canceling: null | ErrorState;
+            deleting: null | ErrorState;
         }
     };
     messages: {
         tasks: {
-            loadingDone: string;
-            importingDone: string;
-            movingDone: string;
+            loadingDone: null | NotificationState;
+            importingDone: null | NotificationState;
+            movingDone: null | NotificationState;
+            mergingConsensusDone: null | NotificationState;
         };
         models: {
-            inferenceDone: string;
+            inferenceDone: null | NotificationState;
         };
         auth: {
-            changePasswordDone: string;
-            registerDone: string;
-            requestPasswordResetDone: string;
-            resetPasswordDone: string;
+            changePasswordDone: null | NotificationState;
+            registerDone: null | NotificationState;
+            requestPasswordResetDone: null | NotificationState;
+            resetPasswordDone: null | NotificationState;
         };
         projects: {
-            restoringDone: string;
+            restoringDone: null | NotificationState;
         };
         exporting: {
-            dataset: string;
-            annotation: string;
-            backup: string;
+            dataset: null | NotificationState;
+            annotation: null | NotificationState;
+            backup: null | NotificationState;
         };
         importing: {
-            dataset: string;
-            annotation: string;
-            backup: string;
+            dataset: null | NotificationState;
+            annotation: null | NotificationState;
+            backup: null | NotificationState;
         };
         invitations: {
-            newInvitations: string;
-            acceptInvitationDone: string;
-            declineInvitationDone: string;
-            resendingInvitation: string;
+            newInvitations: null | NotificationState;
+            acceptInvitationDone: null | NotificationState;
+            declineInvitationDone: null | NotificationState;
+            resendingInvitation: null | NotificationState;
         }
     };
 }
@@ -949,6 +951,18 @@ export interface InvitationsState {
     query: InvitationsQuery;
 }
 
+export interface RequestsQuery {
+    page: number;
+}
+
+export interface RequestsState {
+    fetching: boolean;
+    initialized: boolean;
+    requests: Record<string, Request>;
+    urls: string[];
+    query: RequestsQuery;
+}
+
 export interface CombinedState {
     auth: AuthState;
     projects: ProjectsState;
@@ -966,10 +980,12 @@ export interface CombinedState {
     review: ReviewState;
     export: ExportState;
     import: ImportState;
+    consensus: ConsensusState;
     cloudStorages: CloudStoragesState;
     organizations: OrganizationState;
     invitations: InvitationsState;
     webhooks: WebhooksState;
+    requests: RequestsState;
     serverAPI: ServerAPIState;
 }
 

@@ -6,7 +6,6 @@
 import './styles.scss';
 import React, { useCallback } from 'react';
 import Modal from 'antd/lib/modal';
-import { LoadingOutlined } from '@ant-design/icons';
 import { DimensionType, CVATCore } from 'cvat-core-wrapper';
 import Menu, { MenuInfo } from 'components/dropdown-menu';
 import { usePlugins } from 'utils/hooks';
@@ -23,7 +22,7 @@ interface Props {
     dumpers: AnnotationFormats['dumpers'];
     inferenceIsActive: boolean;
     taskDimension: DimensionType;
-    backupIsActive: boolean;
+    consensusJobsPerNormalJob: number;
     onClickMenu: (params: MenuInfo) => void;
 }
 
@@ -36,6 +35,7 @@ export enum Actions {
     OPEN_BUG_TRACKER = 'open_bug_tracker',
     BACKUP_TASK = 'backup_task',
     VIEW_ANALYTICS = 'view_analytics',
+    SHOW_TASK_CONSENSUS_CONFIGURATION = 'show_task_consensus_configuration',
 }
 
 function ActionsMenuComponent(props: Props): JSX.Element {
@@ -44,7 +44,7 @@ function ActionsMenuComponent(props: Props): JSX.Element {
         projectID,
         bugTracker,
         inferenceIsActive,
-        backupIsActive,
+        consensusJobsPerNormalJob,
         onClickMenu,
     } = props;
 
@@ -101,8 +101,6 @@ function ActionsMenuComponent(props: Props): JSX.Element {
     menuItems.push([(
         <Menu.Item
             key={Actions.BACKUP_TASK}
-            disabled={backupIsActive}
-            icon={backupIsActive && <LoadingOutlined id='cvat-backup-task-loading' />}
         >
             Backup Task
         </Menu.Item>
@@ -115,6 +113,16 @@ function ActionsMenuComponent(props: Props): JSX.Element {
             View analytics
         </Menu.Item>
     ), 50]);
+
+    if (consensusJobsPerNormalJob) {
+        menuItems.push([(
+            <Menu.Item
+                key={Actions.SHOW_TASK_CONSENSUS_CONFIGURATION}
+            >
+                Consensus configuration
+            </Menu.Item>
+        ), 55]);
+    }
 
     if (projectID === null) {
         menuItems.push([(

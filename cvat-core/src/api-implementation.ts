@@ -9,6 +9,7 @@ import config from './config';
 import PluginRegistry from './plugins';
 import serverProxy from './server-proxy';
 import lambdaManager from './lambda-manager';
+import requestsManager from './requests-manager';
 import {
     isBoolean,
     isInteger,
@@ -31,7 +32,7 @@ import Webhook from './webhook';
 import { ArgumentError } from './exceptions';
 import {
     AnalyticsReportFilter, QualityConflictsFilter, QualityReportsFilter,
-    QualitySettingsFilter, SerializedAsset,
+    SettingsFilter, SerializedAsset,
 } from './server-response-types';
 import QualityReport from './quality-report';
 import QualityConflict, { ConflictSeverity } from './quality-conflict';
@@ -42,6 +43,7 @@ import { listActions, registerAction, runActions } from './annotations-actions';
 import { JobType } from './enums';
 import { PaginatedResource } from './core-types';
 import CVATCore from '.';
+import ConsensusSettings from './consensus-settings';
 
 function implementationMixin(func: Function, implementation: Function): void {
     Object.assign(func, { implementation });
@@ -60,6 +62,10 @@ export default function implementAPI(cvat: CVATCore): CVATCore {
     implementationMixin(cvat.lambda.cancel, lambdaManager.cancel.bind(lambdaManager));
     implementationMixin(cvat.lambda.listen, lambdaManager.listen.bind(lambdaManager));
     implementationMixin(cvat.lambda.requests, lambdaManager.requests.bind(lambdaManager));
+
+    implementationMixin(cvat.requests.list, requestsManager.list.bind(requestsManager));
+    implementationMixin(cvat.requests.listen, requestsManager.listen.bind(requestsManager));
+    implementationMixin(cvat.requests.cancel, requestsManager.cancel.bind(requestsManager));
 
     implementationMixin(cvat.server.about, async () => {
         const result = await serverProxy.server.about();
@@ -505,7 +511,7 @@ export default function implementAPI(cvat: CVATCore): CVATCore {
 
         return mergedConflicts;
     });
-    implementationMixin(cvat.analytics.quality.settings.get, async (filter: QualitySettingsFilter) => {
+    implementationMixin(cvat.analytics.quality.settings.get, async (filter: SettingsFilter) => {
         checkFilter(filter, {
             taskID: isInteger,
         });
@@ -514,6 +520,16 @@ export default function implementAPI(cvat: CVATCore): CVATCore {
 
         const settings = await serverProxy.analytics.quality.settings.get(params);
         return new QualitySettings({ ...settings });
+    });
+    implementationMixin(cvat.consensus.settings.get, async (filter: SettingsFilter) => {
+        checkFilter(filter, {
+            taskID: isInteger,
+        });
+
+        const params = fieldsToSnakeCase(filter);
+
+        const settings = await serverProxy.consensus.settings.get(params);
+        return new ConsensusSettings({ ...settings });
     });
     implementationMixin(cvat.analytics.performance.reports, async (filter: AnalyticsReportFilter) => {
         checkFilter(filter, {

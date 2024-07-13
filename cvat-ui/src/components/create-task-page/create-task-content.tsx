@@ -82,6 +82,7 @@ const defaultState: State = {
         },
         useProjectSourceStorage: true,
         useProjectTargetStorage: true,
+        consensusJobsPerNormalJob: 0,
     },
     labels: [],
     files: {
@@ -152,6 +153,7 @@ function filterFiles(remoteFiles: RemoteFile[], many: boolean): RemoteFile[] {
 class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps, State> {
     private basicConfigurationComponent: RefObject<BasicConfigurationForm>;
     private advancedConfigurationComponent: RefObject<AdvancedConfigurationForm>;
+    // private consensusConfigurationComponent: RefObject<ConsensusConfigurationForm>;
     private fileManagerComponent: any;
 
     public constructor(props: Props & RouteComponentProps) {
@@ -159,6 +161,7 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
         this.state = { ...defaultState };
         this.basicConfigurationComponent = React.createRef<BasicConfigurationForm>();
         this.advancedConfigurationComponent = React.createRef<AdvancedConfigurationForm>();
+        // this.consensusConfigurationComponent = React.createRef<ConsensusConfigurationForm>();
     }
 
     public componentDidMount(): void {
@@ -750,6 +753,7 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
                     <Col span={24}>
                         <ProjectSubsetField
                             value={subset}
+                            projectSubsets={null}
                             onChange={this.handleTaskSubsetChange}
                             projectId={projectId}
                         />
@@ -966,7 +970,6 @@ class CreateTaskContent extends React.PureComponent<Props & RouteComponentProps,
                 {this.renderLabelsBlock()}
                 {this.renderFilesBlock()}
                 {this.renderAdvancedBlock()}
-
                 <Col span={24} className='cvat-create-task-content-footer'>
                     {many ? this.renderFooterMultiTasks() : this.renderFooterSingleTask() }
                 </Col>

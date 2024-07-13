@@ -117,6 +117,7 @@ INSTALLED_APPS = [
     'cvat.apps.events',
     'cvat.apps.quality_control',
     'cvat.apps.analytics_report',
+    'cvat.apps.consensus',
 ]
 
 SITE_ID = 1
@@ -239,7 +240,7 @@ IAM_OPA_DATA_URL = f'{IAM_OPA_HOST}/v1/data'
 LOGIN_URL = 'rest_login'
 LOGIN_REDIRECT_URL = '/'
 
-OBJECTS_NOT_RELATED_WITH_ORG = ['user', 'function', 'request', 'server',]
+OBJECTS_NOT_RELATED_WITH_ORG = ['user', 'lambda_function', 'lambda_request', 'server', 'request']
 
 # ORG settings
 ORG_INVITATION_CONFIRM = 'No'
@@ -273,6 +274,7 @@ class CVAT_QUEUES(Enum):
     QUALITY_REPORTS = 'quality_reports'
     ANALYTICS_REPORTS = 'analytics_reports'
     CLEANING = 'cleaning'
+    CONSENSUS = 'consensus'
 
 redis_inmem_host = os.getenv('CVAT_REDIS_INMEM_HOST', 'localhost')
 redis_inmem_port = os.getenv('CVAT_REDIS_INMEM_PORT', 6379)
@@ -315,6 +317,10 @@ RQ_QUEUES = {
         'DEFAULT_TIMEOUT': '1h',
     },
     CVAT_QUEUES.CLEANING.value: {
+        **shared_queue_settings,
+        'DEFAULT_TIMEOUT': '1h',
+    },
+    CVAT_QUEUES.CONSENSUS.value: {
         **shared_queue_settings,
         'DEFAULT_TIMEOUT': '1h',
     },
@@ -636,6 +642,7 @@ SPECTACULAR_SETTINGS = {
         'SortingMethod': 'cvat.apps.engine.models.SortingMethod',
         'WebhookType': 'cvat.apps.webhooks.models.WebhookTypeChoice',
         'WebhookContentType': 'cvat.apps.webhooks.models.WebhookContentTypeChoice',
+        'RequestStatus': 'cvat.apps.engine.serializers.RequestStatus',
     },
 
     # Coercion of {pk} to {id} is controlled by SCHEMA_COERCE_PATH_PK. Additionally,
