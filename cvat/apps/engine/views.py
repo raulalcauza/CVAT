@@ -260,12 +260,10 @@ class ProjectViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
     mixins.RetrieveModelMixin, mixins.CreateModelMixin, mixins.DestroyModelMixin,
     PartialUpdateModelMixin, UploadMixin, DatasetMixin, BackupMixin, CsrfWorkaroundMixin
 ):
-    queryset = models.Project.objects.select_related(
-        'assignee', 'owner', 'target_storage', 'source_storage', 'annotation_guide',
-    ).prefetch_related('tasks').all()
-
     # NOTE: The search_fields attribute should be a list of names of text
     # type fields on the model,such as CharField or TextField
+    queryset = models.Project.objects
+
     search_fields = ('name', 'owner', 'assignee', 'status')
     filter_fields = list(search_fields) + ['id', 'updated_date']
     simple_filters = list(search_fields)
@@ -284,11 +282,23 @@ class ProjectViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
             return ProjectWriteSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        def iam_fields():
+            return ('owner', 'assignee', 'organization')
 
-        if self.action == 'list':
-            perm = ProjectPermission.create_scope_list(self.request)
-            queryset = perm.filter(queryset)
+        if self.action in ('list', 'retrieve', 'partial_update', 'update') :
+            queryset = models.Project.objects.select_related(
+                *iam_fields(),
+                'annotation_guide', 'source_storage', 'target_storage',
+            ).prefetch_related('tasks')
+
+            if self.action == 'list':
+                perm = ProjectPermission.create_scope_list(self.request)
+                queryset = perm.filter(queryset)
+            else:
+                queryset = queryset.filter(**self.kwargs)
+        else:
+            queryset = Project.objects.filter(**self.kwargs).select_related(*iam_fields(), )
+
         return queryset
 
     @transaction.atomic
@@ -625,7 +635,7 @@ class ProjectViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
     def preview(self, request, pk):
         self._object = self.get_object() # call check_object_permissions as well
 
-        first_task = self._object.tasks.order_by('-id').first()
+        first_task = self._object.tasks.select_related('data').order_by('-id').first()
         if not first_task:
             return HttpResponseNotFound('Project image preview not found')
 
@@ -864,6 +874,8 @@ class TaskViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
         if self.action == 'list':
             perm = TaskPermission.create_scope_list(self.request)
             queryset = perm.filter(queryset)
+        elif self.action == 'preview':
+            queryset = Task.objects.filter(**self.kwargs).select_related('data')
 
         return queryset
 
@@ -1694,11 +1706,7 @@ class JobViewSet(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.CreateMo
     mixins.RetrieveModelMixin, PartialUpdateModelMixin, mixins.DestroyModelMixin,
     UploadMixin, DatasetMixin, CsrfWorkaroundMixin
 ):
-    queryset = Job.objects.select_related('assignee', 'segment__task__data',
-        'segment__task__project', 'segment__task__annotation_guide', 'segment__task__project__annotation_guide',
-    ).annotate(
-        Count('issues', distinct=True),
-    ).all()
+    queryset = Job.objects
 
     iam_organization_field = 'segment__task__organization'
     search_fields = ('task_name', 'project_name', 'assignee', 'state', 'stage')
@@ -1721,11 +1729,30 @@ class JobViewSet(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.CreateMo
     )
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        def iam_fields():
+            return (
+                'assignee', 'segment',
+                'segment__task', 'segment__task__owner', 'segment__task__assignee', 'segment__task__organization',
+                'segment__task__project', 'segment__task__project__owner',
+                'segment__task__project__assignee', 'segment__task__project__organization',
+            )
 
-        if self.action == 'list':
-            perm = JobPermission.create_scope_list(self.request)
-            queryset = perm.filter(queryset)
+        if self.action in ('list', 'retrieve', 'update', 'partial_update') :
+            queryset = Job.objects.select_related(
+                *iam_fields(),
+                'segment__task__data', 'segment__task__source_storage', 'segment__task__target_storage',
+                'segment__task__annotation_guide', 'segment__task__project__annotation_guide',
+            ).annotate(
+                Count('issues', distinct=True),
+            ).all()
+
+            if self.action == 'list':
+                perm = JobPermission.create_scope_list(self.request)
+                queryset = perm.filter(queryset)
+            else:
+                queryset = queryset.filter(**self.kwargs)
+        else:
+            queryset = Job.objects.filter(**self.kwargs).select_related(*iam_fields(), )
 
         return queryset
 
@@ -2376,12 +2403,17 @@ class LabelViewSet(viewsets.GenericViewSet, mixins.ListModelMixin,
                 #  OR
                 #  task_id = task_id
                 # )
-                task = Task.objects.get(id=task_id)
+                task = Task.objects.select_related(
+                    'owner', 'assignee', 'organization',
+                    'project', 'project__owner', 'project__assignee',
+                ).get(id=task_id)
                 self.check_object_permissions(self.request, task)
                 queryset = task.get_labels()
             elif project_id:
                 # NOTE: this check is to make behavior consistent with other source filters
-                project = Project.objects.get(id=project_id)
+                project = Project.objects.select_related(
+                    'owner', 'assignee', 'organization',
+                ).get(id=project_id)
                 self.check_object_permissions(self.request, project)
                 queryset = project.get_labels()
             else:
